@@ -309,7 +309,7 @@ export class TilingManager {
             TilingShellWindowManager.get(),
             'maximized',
             (_, window: Meta.Window) => {
-                delete (window as ExtendedWindow).assignedTile;
+                // delete (window as ExtendedWindow).assignedTile;
             },
         );
     }
@@ -1252,15 +1252,19 @@ export class TilingManager {
             window.windowType !== Meta.WindowType.NORMAL ||
             window.get_transient_for() !== null ||
             window.is_attached_dialog() ||
-            window.minimized ||
-            window.maximizedHorizontally ||
-            window.maximizedVertically
+            window.minimized
+            // || window.maximizedHorizontally
+            // || window.maximizedVertically
         )
             return;
 
         (window as ExtendedWindow).assignedTile = undefined;
         const vacantTile = this._findEmptyTile(window);
-        if (!vacantTile) return;
+        // if (!vacantTile) return;
+
+        // If no vacant tile found, just use the center tile
+        const tileToUse = vacantTile || this._findCenterTile(window);
+        if (!tileToUse) return;
 
         if (windowCreated) {
             const windowActor =
@@ -1271,19 +1275,42 @@ export class TilingManager {
                 // if the window is no longer a good candidate for
                 // autotiling, immediately restore its opacity
                 if (
-                    !window.minimized &&
-                    !window.maximizedHorizontally &&
-                    !window.maximizedVertically &&
-                    window.get_transient_for() === null &&
-                    !window.is_attached_dialog()
+                    !window.minimized
+                    // && !window.maximizedHorizontally
+                    // && !window.maximizedVertically
+                    && window.get_transient_for() === null
+                    && !window.is_attached_dialog()
                 )
-                    this._easeWindowRectFromTile(vacantTile, window, true);
+                    this._easeWindowRectFromTile(tileToUse, window, true);
 
                 windowActor.disconnect(id);
             });
         } else {
-            this._easeWindowRectFromTile(vacantTile, window, true);
+            this._easeWindowRectFromTile(tileToUse, window, true);
         }
+    }
+
+    private _findCenterTile(window: Meta.Window): Tile | undefined {
+        const tiles = GlobalState.get().getSelectedLayoutOfMonitor(
+            window.get_monitor(),
+            global.workspaceManager.get_active_workspace_index(),
+        ).tiles;
+
+        if (tiles.length === 0) return undefined;
+
+        // Find the tile closest to the center of the screen
+        let centerTile = tiles[0];
+        let minDistance = Math.abs(0.5 - (centerTile.x + centerTile.width / 2));
+
+        for (const tile of tiles) {
+            const distance = Math.abs(0.5 - (tile.x + tile.width / 2));
+            if (distance < minDistance) {
+                centerTile = tile;
+                minDistance = distance;
+            }
+        }
+
+        return centerTile;
     }
 
     private _findEmptyTile(window: Meta.Window): Tile | undefined {
@@ -1292,9 +1319,9 @@ export class TilingManager {
                 return (
                     otherWindow &&
                     (otherWindow as ExtendedWindow).assignedTile &&
-                    !otherWindow.minimized &&
-                    !otherWindow.maximizedVertically &&
-                    !otherWindow.maximizedHorizontally
+                    !otherWindow.minimized // &&
+                    // !otherWindow.maximizedVertically &&
+                    // !otherWindow.maximizedHorizontally
                 );
             })
             .map((w) => w as ExtendedWindow);
