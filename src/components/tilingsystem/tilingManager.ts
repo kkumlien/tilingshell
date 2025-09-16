@@ -1253,6 +1253,8 @@ export class TilingManager {
             window.get_transient_for() !== null ||
             window.is_attached_dialog() ||
             window.minimized
+            || window.get_wm_class() === null
+            // || this._shouldIgnoreWindowForAutoTiling(window)
             // || window.maximizedHorizontally
             // || window.maximizedVertically
         )
@@ -1288,6 +1290,37 @@ export class TilingManager {
         } else {
             this._easeWindowRectFromTile(tileToUse, window, true);
         }
+    }
+
+    private _shouldIgnoreWindowForAutoTiling(window: Meta.Window): boolean {
+        // Get window class (application identifier)
+        const windowClass = window.get_wm_class();
+        const windowTitle = window.get_title();
+
+        // List of window classes to ignore (you can make this configurable via Settings)
+        const ignoredClasses = [
+            'ibus-extension-gtk3', // IBus emoji picker (Super+.)
+            // 'ibus-ui-gtk3', // IBus input method panels
+            // 'firefox', // Example: ignore Firefox windows
+            // 'code', // Example: ignore VS Code
+            // Add more as needed
+        ];
+
+        this._debug(`=== AUTO-TILE DEBUG ===`);
+        this._debug(`Title: "${windowTitle}"`);
+        this._debug(`Class: "${windowClass}"`);
+        this._debug(`Type: ${window.get_window_type()}`);
+        this._debug(`Role: "${window.get_role()}"`);
+        this._debug(`Size: ${window.get_frame_rect().width}x${window.get_frame_rect().height}`);
+
+        // Check window class
+        if (windowClass && ignoredClasses.some(ignored =>
+            windowClass.toLowerCase().includes(ignored.toLowerCase()))) {
+            this._debug(`Ignoring window for auto-tiling: ${windowClass}`);
+            return true;
+        }
+
+        return false;
     }
 
     private _findCenterTile(window: Meta.Window): Tile | undefined {
