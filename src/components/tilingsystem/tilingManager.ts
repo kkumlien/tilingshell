@@ -293,7 +293,21 @@ export class TilingManager {
             global.display,
             'window-created',
             (_display: Meta.Display, window: Meta.Window) => {
-                if (Settings.ENABLE_AUTO_TILING) this._autoTile(window, true);
+
+                if (Settings.ENABLE_AUTO_TILING) {
+                    // Try auto-tiling immediately (works for native apps)
+                    this._autoTile(window, true);
+
+                    // If window class is null, try again after delay (for Flatpak apps)
+                    if (window.get_wm_class() === null) {
+                        setTimeout(() => {
+                            if (Settings.ENABLE_BLUR_SNAP_ASSISTANT) {
+                                this._debug(`Retrying auto-tile with Class: "${window.get_wm_class()}"`);
+                            }
+                            this._autoTile(window, false); // Try again with populated properties
+                        }, 350);
+                    }
+                }
             },
         );
         this._signals.connect(
@@ -1254,7 +1268,7 @@ export class TilingManager {
             window.is_attached_dialog() ||
             window.minimized
             || window.get_wm_class() === null
-            // || this._shouldIgnoreWindowForAutoTiling(window)
+            || this._shouldIgnoreWindowForAutoTiling(window)
             // || window.maximizedHorizontally
             // || window.maximizedVertically
         )
@@ -1295,28 +1309,31 @@ export class TilingManager {
     private _shouldIgnoreWindowForAutoTiling(window: Meta.Window): boolean {
         // Get window class (application identifier)
         const windowClass = window.get_wm_class();
-        const windowTitle = window.get_title();
+        // const windowTitle = window.get_title();
 
         // List of window classes to ignore (you can make this configurable via Settings)
         const ignoredClasses = [
             'ibus-extension-gtk3', // IBus emoji picker (Super+.)
             // 'ibus-ui-gtk3', // IBus input method panels
-            // 'firefox', // Example: ignore Firefox windows
+            // 'firefox', // Example: ignore Firefox
             // 'code', // Example: ignore VS Code
             // Add more as needed
         ];
 
-        this._debug(`=== AUTO-TILE DEBUG ===`);
-        this._debug(`Title: "${windowTitle}"`);
-        this._debug(`Class: "${windowClass}"`);
-        this._debug(`Type: ${window.get_window_type()}`);
-        this._debug(`Role: "${window.get_role()}"`);
-        this._debug(`Size: ${window.get_frame_rect().width}x${window.get_frame_rect().height}`);
+        // if (Settings.ENABLE_BLUR_SNAP_ASSISTANT) {
+        //     this._debug(`=== AUTO-TILE DEBUG ===`);
+        //     this._debug(`Title: "${windowTitle}"`);
+        //     this._debug(`Class: "${windowClass}"`);
+        //     this._debug(`Type: ${window.get_window_type()}`);
+        //     this._debug(`Role: "${window.get_role()}"`);
+        //     this._debug(`Size: ${window.get_frame_rect().width}x${window.get_frame_rect().height}`);
+        // }
 
         // Check window class
         if (windowClass && ignoredClasses.some(ignored =>
             windowClass.toLowerCase().includes(ignored.toLowerCase()))) {
-            this._debug(`Ignoring window for auto-tiling: ${windowClass}`);
+            if (Settings.ENABLE_BLUR_SNAP_ASSISTANT) this._debug(`Ignoring window for auto-tiling: ${windowClass}`
+            );
             return true;
         }
 
